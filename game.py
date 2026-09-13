@@ -284,16 +284,18 @@ class SurvivalGame:
         stray LOG tile (dormant: trees are the only log source now) is
         picked up, and walking onto a tree's trunk collects a log and
         clears the whole tree (see _tree_base_for), no mining, matching
-        pig-runner's walk-over collectibles. Checked every step, not just
-        after a move, since with continuous position "did you move to a
-        new cell" isn't the only way to still be standing in one."""
+        pig-runner's walk-over collectibles. One log yields
+        C.PLANKS_PER_LOG usable planks (placing still only costs 1, see
+        _try_place). Checked every step, not just after a move, since with
+        continuous position "did you move to a new cell" isn't the only
+        way to still be standing in one."""
         x, y = int(self.px), int(self.py)
         if not W.in_bounds(x, y):
             return
         tile = self.grid[y][x]
         if tile == W.LOG:
             self.grid[y][x] = W.GRASS
-            self.inventory += 1
+            self.inventory += C.PLANKS_PER_LOG
             self.score += 1
         elif tile == W.TREE_LOG:
             base = self._tree_base_for(x, y)
@@ -304,7 +306,7 @@ class SurvivalGame:
                 self._tree_bases.discard(base)
             else:
                 self.grid[y][x] = W.GRASS
-            self.inventory += 1
+            self.inventory += C.PLANKS_PER_LOG
             self.score += 1
         elif tile == W.LAVA:
             self.dead = True
@@ -340,12 +342,15 @@ class SurvivalGame:
         return count
 
     def _adjacency_reward(self):
-        """Fires the one-time +3/+5 transition rewards and the recurring
-        enclosed-tick reward. Adjacency only ever changes by +-1 per step
-        (one placement at a time), so 0->1->2->3->4 transitions are never
-        skipped."""
+        """Fires the one-time +2/+3/+5 transition rewards (staircase:
+        1 for the first block ever placed, see _try_place, then 2, 3, 5 as
+        adjacent solid sides reach 2, 3, 4) and the recurring enclosed-tick
+        reward. Adjacency only ever changes by +-1 per step (one placement
+        at a time), so 0->1->2->3->4 transitions are never skipped."""
         count = self._adjacent_solid_count()
         reward = 0.0
+        if count >= 2 and self._prev_adjacent < 2:
+            reward += C.REWARD_TWO_ADJACENT
         if count >= 3 and self._prev_adjacent < 3:
             reward += C.REWARD_THREE_ADJACENT
         if count >= 4 and self._prev_adjacent < 4:

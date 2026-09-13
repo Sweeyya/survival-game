@@ -492,7 +492,7 @@ def draw_hud(surf, g):
     phase = "night, zombies spawning" if g.is_night else "day"
     lines = [
         f"step {g.steps}  score {g.score}  [{phase}]",
-        f"logs {g.inventory}  zombies {len(g.zombies)}",
+        f"planks {g.inventory}  zombies {len(g.zombies)}",
     ]
     y = 6
     for line in lines:

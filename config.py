@@ -20,13 +20,19 @@ NIGHT_LENGTH = 360
 ZOMBIE_SPAWN_INTERVAL = 160   # steps between spawns, once it's night
 MAX_ZOMBIES = 6
 
+# --- Resources ---------------------------------------------------------
+PLANKS_PER_LOG = 4   # one collected log yields this many usable planks
+
 # --- Episode length ----------------------------------------------------
 # Not enforced here, the training harness's TimeLimit wrapper owns it
 # (time_limit: 8000); we only ever report a real death via discount=0.
 MAX_STEPS = 8000
 
 # --- Rewards -------------------------------------------------------------
+# Staircase as adjacent solid sides go 0 -> 4: 1 (first block ever placed,
+# see _try_place), 2, 3, 5.
 REWARD_FIRST_BLOCK = 1.0
+REWARD_TWO_ADJACENT = 2.0
 REWARD_THREE_ADJACENT = 3.0
 REWARD_FOUR_ADJACENT = 5.0
 REWARD_ENCLOSED_TICK = 1.0
