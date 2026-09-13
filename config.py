@@ -1,0 +1,40 @@
+"""Tune difficulty/content here. No code changes needed elsewhere."""
+
+# --- Map generation (fixed at reset, not regenerated mid-episode) ---------
+NUM_TREES = 5           # trees can overlap now (only the base cell blocks),
+                        # kept low so that stays a minor, occasional thing
+NUM_LAVA_POOLS = 2      # a few contiguous blobs, not scattered single tiles
+LAVA_POOL_SIZE = 6
+
+# --- Movement --------------------------------------------------------------
+MOVE_SPEED = 0.22    # cells/step, about 4-5 steps to cross one tile
+ZOMBIE_SPEED = 0.09  # cells/step, much slower than the player
+PLAYER_RADIUS = 0.3  # collision half-width, in cells (player and zombies)
+
+# --- Day / night cycle -------------------------------------------------
+# 360 steps = 30 seconds at play.py's human-mode tick rate (12 steps/sec).
+DAY_LENGTH = 360
+NIGHT_LENGTH = 360
+
+# --- Zombies ---------------------------------------------------------------
+ZOMBIE_SPAWN_INTERVAL = 160   # steps between spawns, once it's night
+MAX_ZOMBIES = 6
+
+# --- Mining ------------------------------------------------------------
+BREAK_TIME_STEPS = 10  # consecutive BREAK presses on the same target
+
+# --- Episode length ----------------------------------------------------
+# Not enforced here, the training harness's TimeLimit wrapper owns it
+# (time_limit: 8000); we only ever report a real death via discount=0.
+MAX_STEPS = 8000
+
+# --- Rewards -------------------------------------------------------------
+REWARD_FIRST_BLOCK = 1.0
+REWARD_THREE_ADJACENT = 3.0
+REWARD_FOUR_ADJACENT = 5.0
+REWARD_ENCLOSED_TICK = 1.0
+ENCLOSED_INTERVAL_STEPS = 10   # while all 4 sides solid, +1 every N steps
+
+# --- Observation -----------------------------------------------------------
+WINDOW_RADIUS = 3      # 7x7 window
+INVENTORY_CAP = 10.0   # log count normalizes against this

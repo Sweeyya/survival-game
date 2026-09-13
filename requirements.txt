@@ -1,0 +1,4 @@
+pygame>=2.5
+gymnasium>=0.29
+numpy>=1.24
+imageio>=2.31
