@@ -7,7 +7,6 @@ pig-runner/render.py's sprite-or-fallback pattern).
 """
 
 import os
-import random
 
 import numpy as np
 import pygame
@@ -306,55 +305,6 @@ def _leaf_cap_key(g, gx, gy):
     return key, is_cap
 
 
-_crack_segments_cache = None
-
-
-def _crack_segments():
-    """A fixed fracture pattern (a few cracks radiating out from the
-    center plus some crossing shards), generated once with its own seeded
-    RNG so it's the same every time, not re-randomized per block or per
-    frame. _draw_break_overlay reveals more of it as progress grows,
-    closer to Minecraft's own multi-stage crack texture than a single
-    growing X."""
-    global _crack_segments_cache
-    if _crack_segments_cache is None:
-        rng = random.Random(12345)
-        cx, cy = W.TILE / 2, W.TILE / 2
-        segments = [
-            ((cx, cy), (rng.uniform(3, W.TILE - 3), rng.uniform(3, W.TILE - 3)))
-            for _ in range(5)
-        ]
-        segments += [
-            (
-                (rng.uniform(4, W.TILE - 4), rng.uniform(4, W.TILE - 4)),
-                (rng.uniform(4, W.TILE - 4), rng.uniform(4, W.TILE - 4)),
-            )
-            for _ in range(5)
-        ]
-        _crack_segments_cache = segments
-    return _crack_segments_cache
-
-
-def _draw_break_overlay(surf, g):
-    """Mining feedback: a growing web of cracks over whatever's currently
-    being broken (procedural, no new art needed), revealing more of
-    _crack_segments and darkening as progress grows."""
-    target = g._break_target
-    if target is None:
-        return
-    tx, ty = target
-    progress = g._break_progress / C.BREAK_TIME_STEPS
-    x, y = tx * W.TILE, ty * W.TILE
-    segments = _crack_segments()
-    stages = max(1, round(progress * len(segments)))
-    alpha = 90 + int(140 * progress)
-    col = (15, 15, 15, alpha)
-    overlay = pygame.Surface((W.TILE, W.TILE), pygame.SRCALPHA)
-    for p1, p2 in segments[:stages]:
-        pygame.draw.line(overlay, col, p1, p2, 2)
-    surf.blit(overlay, (x, y))
-
-
 _sky_strip_cache = None
 
 
@@ -442,11 +392,6 @@ def draw_world(surf, g, dead_frames=0):
     drawables.sort(key=lambda d: d[0])
     for _, draw_fn in drawables:
         draw_fn()
-
-    # After the sort, not before: the target could be a TREE_LOG cell drawn
-    # taller than its own square, which would otherwise paint over a crack
-    # drawn earlier and hide it.
-    _draw_break_overlay(surf, g)
 
     draw_night_overlay(surf, g)
 
@@ -547,7 +492,7 @@ def draw_hud(surf, g):
     phase = "night, zombies spawning" if g.is_night else "day"
     lines = [
         f"step {g.steps}  score {g.score}  [{phase}]",
-        f"planks {g.inventory}  zombies {len(g.zombies)}",
+        f"logs {g.inventory}  zombies {len(g.zombies)}",
     ]
     y = 6
     for line in lines:

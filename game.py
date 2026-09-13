@@ -28,8 +28,8 @@ except ImportError:
     import config as C
     import world as W
 
-ACTION_UP, ACTION_DOWN, ACTION_LEFT, ACTION_RIGHT, ACTION_PLACE, ACTION_BREAK = 0, 1, 2, 3, 4, 5
-NUM_ACTIONS = 6
+ACTION_UP, ACTION_DOWN, ACTION_LEFT, ACTION_RIGHT, ACTION_PLACE = 0, 1, 2, 3, 4
+NUM_ACTIONS = 5
 _MOVE_ACTION_TO_DIR = {
     ACTION_UP: W.UP,
     ACTION_DOWN: W.DOWN,
@@ -70,8 +70,8 @@ def _tree_cells(x, y):
     return cells
 
 # window(49) + inventory(1) + zombie dx/dy/count(3) + facing one-hot(4)
-# + steps(1) + adjacent-solid count(1) + break progress(1)
-OBS_DIM = (2 * C.WINDOW_RADIUS + 1) ** 2 + 1 + 3 + 4 + 1 + 1 + 1
+# + steps(1) + adjacent-solid count(1)
+OBS_DIM = (2 * C.WINDOW_RADIUS + 1) ** 2 + 1 + 3 + 4 + 1 + 1
 NO_ZOMBIE_SENTINEL = 1.5  # matches pig-runner's DIST_CLIP_HI "nothing there" idiom
 
 
@@ -119,8 +119,6 @@ class SurvivalGame:
         self._prev_adjacent = self._adjacent_solid_count()
         self._enclosed_streak = 0
         self._next_zombie_spawn = C.ZOMBIE_SPAWN_INTERVAL
-        self._break_target = None   # (tx, ty) currently being mined, or None
-        self._break_progress = 0
         return self.observation()
 
     @property
@@ -201,16 +199,8 @@ class SurvivalGame:
         reward = 0.0
         was_night = self.is_night
 
-        # Mining only continues across consecutive BREAK presses on the same
-        # target (see _mine), anything else resets progress to nothing.
-        if action != ACTION_BREAK:
-            self._break_target = None
-            self._break_progress = 0
-
         if action == ACTION_PLACE:
             reward += self._try_place()
-        elif action == ACTION_BREAK:
-            reward += self._mine()
         elif action in _MOVE_ACTION_TO_DIR:
             self._move(_MOVE_ACTION_TO_DIR[action])
         # any other value is a no-op, same as pig-runner treats out-of-range actions
@@ -277,18 +267,43 @@ class SurvivalGame:
                     return True
         return False
 
+    def _tree_base_for(self, x, y):
+        """Which tree's base a (x, y) TREE_LOG cell belongs to, checking
+        every possible trunk offset (the base itself, or however many
+        rows above it TREE_LOGS_TALL allows) rather than assuming a fixed
+        height. None if it isn't part of any tree (shouldn't happen for a
+        real TREE_LOG cell, but keeps _apply_cell_effects safe either way)."""
+        for i in range(TREE_LOGS_TALL):
+            base = (x, y + i)
+            if base in self._tree_bases:
+                return base
+        return None
+
     def _apply_cell_effects(self):
-        """Whatever cell the player is currently standing in, LAVA kills,
-        a stray LOG tile (dormant: trees are the only log source now) is
-        picked up. Checked every step, not just after a move, since with
-        continuous position "did you move to a new cell" isn't the only
-        way to still be standing in one."""
+        """Whatever cell the player is currently standing in: LAVA kills, a
+        stray LOG tile (dormant: trees are the only log source now) is
+        picked up, and walking onto a tree's trunk collects a log and
+        clears the whole tree (see _tree_base_for), no mining, matching
+        pig-runner's walk-over collectibles. Checked every step, not just
+        after a move, since with continuous position "did you move to a
+        new cell" isn't the only way to still be standing in one."""
         x, y = int(self.px), int(self.py)
         if not W.in_bounds(x, y):
             return
         tile = self.grid[y][x]
         if tile == W.LOG:
             self.grid[y][x] = W.GRASS
+            self.inventory += 1
+            self.score += 1
+        elif tile == W.TREE_LOG:
+            base = self._tree_base_for(x, y)
+            if base is not None:
+                for cx, cy in _tree_cells(*base):
+                    if W.in_bounds(cx, cy):
+                        self.grid[cy][cx] = W.GRASS
+                self._tree_bases.discard(base)
+            else:
+                self.grid[y][x] = W.GRASS
             self.inventory += 1
             self.score += 1
         elif tile == W.LAVA:
@@ -311,63 +326,6 @@ class SurvivalGame:
             self._placed_first_block = True
             reward += C.REWARD_FIRST_BLOCK
         return reward
-
-    def _breakable_target(self):
-        """The cell BREAK should act on: whichever adjacent cell is
-        currently being mined (if it's still there and still adjacent), or
-        else the nearest breakable neighbor, preferring the one you're
-        facing but not requiring it. You just need to be standing next to
-        a block/log, not looking at it."""
-        px, py = int(self.px), int(self.py)
-
-        def is_breakable(x, y):
-            return W.in_bounds(x, y) and self.grid[y][x] in (W.BLOCK, W.TREE_LOG)
-
-        if self._break_target is not None:
-            tx, ty = self._break_target
-            if abs(tx - px) + abs(ty - py) == 1 and is_breakable(tx, ty):
-                return self._break_target
-
-        for direction in (self.facing, W.UP, W.DOWN, W.LEFT, W.RIGHT):
-            dx, dy = W.DIRS[direction]
-            tx, ty = px + dx, py + dy
-            if is_breakable(tx, ty):
-                return (tx, ty)
-        return None
-
-    def _mine(self):
-        """Hold BREAK on the same target C.BREAK_TIME_STEPS consecutive
-        presses to actually break it (any *other* action resets progress
-        to nothing entirely, see step()); moving away from the target or
-        having nothing breakable nearby resets it too. A placed BLOCK
-        breaks back into 1 inventory (what it cost to place) with no
-        reward (placing+breaking in a loop would otherwise farm score for
-        free). A TREE_LOG breaks into 4 planks, matching Minecraft's
-        log-to-planks yield, one segment at a time; any segment can be
-        targeted this way, whether or not it's the tree's solid base (only
-        movement cares about that distinction). LEAVES aren't breakable;
-        anything else (grass, lava, empty/OOB) is a no-op."""
-        target = self._breakable_target()
-        if target is None:
-            self._break_target = None
-            self._break_progress = 0
-            return 0.0
-
-        if target != self._break_target:
-            self._break_target = target
-            self._break_progress = 0
-        self._break_progress += 1
-        if self._break_progress < C.BREAK_TIME_STEPS:
-            return 0.0
-
-        tx, ty = target
-        tile = self.grid[ty][tx]
-        self.grid[ty][tx] = W.GRASS
-        self.inventory += 4 if tile == W.TREE_LOG else 1
-        self.score += 1
-        self._break_target = None
-        self._break_progress = 0
-        return 0.0
 
     def _adjacent_solid_count(self):
         px, py = int(self.px), int(self.py)
@@ -503,11 +461,10 @@ class SurvivalGame:
         facing_onehot = [1.0 if self.facing == d else 0.0 for d in (W.UP, W.DOWN, W.LEFT, W.RIGHT)]
         steps_norm = min(1.0, self.steps / C.MAX_STEPS)
         adjacent_norm = self._adjacent_solid_count() / 4.0
-        break_norm = (self._break_progress / C.BREAK_TIME_STEPS) if self._break_target else 0.0
 
         return (
             window_norm
             + [float(inventory_norm), float(zdx), float(zdy), float(zombie_count_norm)]
             + facing_onehot
-            + [float(steps_norm), float(adjacent_norm), float(break_norm)]
+            + [float(steps_norm), float(adjacent_norm)]
         )

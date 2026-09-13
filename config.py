@@ -20,9 +20,6 @@ NIGHT_LENGTH = 360
 ZOMBIE_SPAWN_INTERVAL = 160   # steps between spawns, once it's night
 MAX_ZOMBIES = 6
 
-# --- Mining ------------------------------------------------------------
-BREAK_TIME_STEPS = 10  # consecutive BREAK presses on the same target
-
 # --- Episode length ----------------------------------------------------
 # Not enforced here, the training harness's TimeLimit wrapper owns it
 # (time_limit: 8000); we only ever report a real death via discount=0.

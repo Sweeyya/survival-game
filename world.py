@@ -7,18 +7,19 @@ TILE = 32          # on-screen pixels per cell (2x the 16px source art)
 CENTER = GRID // 2  # player spawn cell (both axes)
 
 # --- Tile IDs -----------------------------------------------------------
-# A tree isn't one tile, it's several cells built by game.py's
-# _tree_cells. TREE_LOG segments are individually breakable; only a tree's
-# base log is solid (see game._tree_bases), everything else is walk-through
-# and depth-sorted at render time. ZOMBIE/OOB are observation-only stamps,
-# never written to the map.
+# A tree isn't one tile, it's several cells built by game.py's _tree_cells.
+# Walking onto the trunk collects a log and clears the whole tree (see
+# game._apply_cell_effects); only a tree's base log is solid (see
+# game._tree_bases), everything else is walk-through and depth-sorted at
+# render time. ZOMBIE/OOB are observation-only stamps, never written to
+# the map.
 GRASS = 0
 LOG = 1        # a pickup lying on the ground; walk over it for +1 inventory
 BLOCK = 2      # placed wall
 LAVA = 3
-TREE_LOG = 4   # one segment of a tree's trunk; breakable -> +1 log
-LEAVES = 5     # tree canopy; not breakable
-SKY = 6        # top border strip; solid, unbreakable, just a backdrop
+TREE_LOG = 4   # one segment of a tree's trunk; walk over it for +1 log
+LEAVES = 5     # tree canopy
+SKY = 6        # top border strip; solid, just a backdrop
 ZOMBIE = 7
 OOB = 8
 

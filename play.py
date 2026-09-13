@@ -1,20 +1,19 @@
 """Watch or play the game.
 
-    python play.py                  # play it yourself: arrows/WASD move, SPACE place, E break
+    python play.py                  # play it yourself: arrows/WASD move, SPACE place
     python play.py --mode random    # random policy, the untrained baseline
     python play.py --record run.gif --episodes 1
 
 Keys: WASD/arrows move (also turns you to face that way) | SPACE place block
-| E break whatever you're facing (a placed block, or a tree for a log).
-HOLD it down: breaking takes config.BREAK_TIME_STEPS steps and a growing
-crack overlay shows progress | R reset | ESC quit
+| R reset | ESC quit
 
-Movement and breaking are sampled every frame from whatever's currently
-held down (pygame.key.get_pressed()), not one-shot key-press events, both
-need to work while held, movement to walk continuously and breaking to
-actually accumulate progress across steps. Place stays a one-shot tap
-(KEYDOWN) since one press should place exactly one block, not spam them
-for as long as the key is held.
+Walk onto a tree's trunk to collect a log and clear the whole tree, no
+mining, matching pig-runner's walk-over collectibles. Movement is sampled
+every frame from whatever's currently held down
+(pygame.key.get_pressed()), not one-shot key-press events, so holding a
+direction walks continuously. Place stays a one-shot tap (KEYDOWN) since
+one press should place exactly one block, not spam them for as long as
+the key is held.
 
 Zombies only spawn at night (see config.DAY_LENGTH / NIGHT_LENGTH); the
 screen darkens and the HUD flags it once night falls.
@@ -30,12 +29,11 @@ import world as W
 from game import SurvivalGame
 from render import draw_death_screen, draw_hud, draw_win_screen, draw_world
 
-_KEY_TO_MOVE_OR_BREAK = {
+_KEY_TO_MOVE = {
     pygame.K_UP: G.ACTION_UP, pygame.K_w: G.ACTION_UP,
     pygame.K_DOWN: G.ACTION_DOWN, pygame.K_s: G.ACTION_DOWN,
     pygame.K_LEFT: G.ACTION_LEFT, pygame.K_a: G.ACTION_LEFT,
     pygame.K_RIGHT: G.ACTION_RIGHT, pygame.K_d: G.ACTION_RIGHT,
-    pygame.K_e: G.ACTION_BREAK,
 }
 
 
@@ -95,16 +93,10 @@ def main():
                     action = G.ACTION_PLACE
                 else:
                     keys = pygame.key.get_pressed()
-                    # BREAK takes priority: if you're holding E, that's a
-                    # deliberate stationary action and shouldn't get
-                    # preempted by an incidentally-held movement key.
-                    if keys[pygame.K_e]:
-                        action = G.ACTION_BREAK
-                    else:
-                        for key, act in _KEY_TO_MOVE_OR_BREAK.items():
-                            if keys[key]:
-                                action = act
-                                break
+                    for key, act in _KEY_TO_MOVE.items():
+                        if keys[key]:
+                            action = act
+                            break
             else:
                 action = rng.randrange(G.NUM_ACTIONS)
             place_pressed = False
