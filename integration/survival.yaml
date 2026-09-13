@@ -1,0 +1,22 @@
+# configs/env/survival.yaml  --  modelled on pigrunner.yaml (vector obs, no pixels)
+task: survival_v0
+steps: 3e5              # higher than pigrunner's 2e5: multi-step goal (gather
+                        # resources, place blocks, hold an enclosure, survive
+                        # a full day/night cycle) takes longer to learn
+env_num: 16
+eval_episode_num: 10
+action_repeat: 1
+train_ratio: 512
+time_limit: 1000        # covers one full day/night cycle (360+360=720 steps)
+                        # plus margin, so episodes aren't truncated mid-fight
+
+seed: ${seed}
+device: ${device}
+
+size: [64, 64]          # unused: nothing renders during training
+encoder:
+  mlp_keys: '.*'        # the 60-number state vector goes to the MLP
+  cnn_keys: '$^'        # matches nothing, so no pixels ever reach the model
+decoder:
+  mlp_keys: '.*'
+  cnn_keys: '$^'

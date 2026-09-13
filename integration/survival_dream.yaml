@@ -1,0 +1,19 @@
+# configs/model/survival_dream.yaml
+#
+# Same architecture as size12M, generic (not sized to any particular obs
+# dimension); the MLP encoder's input width adapts automatically to
+# whatever observation actually arrives, so a 60-dim state vector needs no
+# resizing here versus pigrunner_dream.yaml's 11-dim one -- checked
+# pigrunner_dream.yaml against size12M directly, and rep_loss is its only
+# change, nothing there scales with OBS_DIM. This just opts into the
+# classic reconstruction objective instead of r2dreamer's default
+# decoder-free one, so you can render what the world model imagines
+# (notebooks/train_and_watch.ipynb, "Watch the world model dream" section).
+# Normal training doesn't need this and trains faster without it.
+#
+# Usage: python train.py env=survival model=survival_dream
+
+defaults:
+  - size12M
+
+rep_loss: "dreamer"

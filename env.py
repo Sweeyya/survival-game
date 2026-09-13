@@ -64,6 +64,9 @@ class SurvivalEnv(gym.Env):
         return obs, np.float32(reward), done, info
 
     def render(self):
-        from render import render_rgb
+        try:  # works both standalone and when copied into r2dreamer's envs/ package
+            from .render import render_rgb
+        except ImportError:
+            from render import render_rgb
 
         return render_rgb(self._game)

@@ -12,8 +12,12 @@ import random
 import numpy as np
 import pygame
 
-import config as C
-import world as W
+try:  # works both standalone and when copied into r2dreamer's envs/ package
+    from . import config as C
+    from . import world as W
+except ImportError:
+    import config as C
+    import world as W
 
 ASSET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
