@@ -78,15 +78,32 @@ NO_ZOMBIE_SENTINEL = 1.5  # matches pig-runner's DIST_CLIP_HI "nothing there" id
 class SurvivalGame:
     """The game itself. Advance it with step(action); read state off the attrs."""
 
-    def __init__(self, seed=0):
+    def __init__(self, seed=0, curriculum=False):
         self._rng = random.Random(seed)
+        self._curriculum = curriculum
+        self._lifetime_steps = 0
         self.reset()
+
+    def _settings_for_episode(self):
+        """Return this episode's training settings. The game itself owns a
+        local lifetime counter because r2dreamer does not pass its global
+        counter into environments. With 16 parallel environments, the two
+        thresholds in config correspond roughly to 75k and 150k global
+        training steps."""
+        if not self._curriculum:
+            return {"starting_planks": 0, "nearby_tree": False, "zombies": True}
+        settings = C.CURRICULUM_STAGES[0]
+        for candidate in C.CURRICULUM_STAGES:
+            if self._lifetime_steps >= candidate["after_env_steps"]:
+                settings = candidate
+        return settings
 
     # lifecycle
     def reset(self, seed=None):
         if seed is not None:
             self._rng.seed(seed)
 
+        self._episode_settings = self._settings_for_episode()
         self.grid = [[W.GRASS] * W.GRID for _ in range(W.GRID)]
         for y in range(W.SKY_ROWS):
             for x in range(W.GRID):
@@ -95,7 +112,7 @@ class SurvivalGame:
         # is a real float from here on, see the module docstring.
         self.px, self.py = W.CENTER + 0.5, W.CENTER + 0.5
         self.facing = W.DEFAULT_FACING
-        self.inventory = 0
+        self.inventory = self._episode_settings["starting_planks"]
         self.zombies = []  # list of [x, y] floats
 
         # A 3x3 clearance around spawn, not just the player's own cell.
@@ -108,6 +125,8 @@ class SurvivalGame:
         }
         occupied.update((x, y) for y in range(W.SKY_ROWS) for x in range(W.GRID))
         self._tree_bases = set()  # which TREE_LOG cells are actually solid; see _box_blocked
+        if self._episode_settings["nearby_tree"]:
+            self._place_nearby_tree(occupied)
         self._scatter_trees(C.NUM_TREES, occupied)
         self._scatter_lava_pools(C.NUM_LAVA_POOLS, C.LAVA_POOL_SIZE, occupied)
 
@@ -120,6 +139,19 @@ class SurvivalGame:
         self._enclosed_streak = 0
         self._next_zombie_spawn = C.ZOMBIE_SPAWN_INTERVAL
         return self.observation()
+
+    def _place_nearby_tree(self, occupied):
+        """Guarantee one reachable log during the collection lesson.
+        Its upper trunk segment is a few moves right and down from spawn,
+        while the base stays a real obstacle like every other tree."""
+        x, y = W.CENTER + 3, W.CENTER + 2
+        cells = _tree_cells(x, y)
+        if any(not W.in_bounds(cx, cy) or (cx, cy) in occupied for cx, cy in cells):
+            return
+        for (cx, cy), tile in cells.items():
+            self.grid[cy][cx] = tile
+            occupied.add((cx, cy))
+        self._tree_bases.add((x, y))
 
     @property
     def is_night(self):
@@ -210,7 +242,7 @@ class SurvivalGame:
         if self._touching_zombie():
             self.dead = True
 
-        if not self.dead:
+        if not self.dead and self._episode_settings["zombies"]:
             self._spawn_zombies_if_due()
             self._move_zombies()
             if self._touching_zombie():
@@ -219,6 +251,7 @@ class SurvivalGame:
         reward += self._adjacency_reward()
 
         self.steps += 1
+        self._lifetime_steps += 1
         # Night just ended (was_night flips to not-night at the top of a
         # new cycle) and the player's still alive to see it: that's a win.
         if was_night and not self.is_night and not self.dead:

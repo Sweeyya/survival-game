@@ -22,6 +22,17 @@ MAX_ZOMBIES = 6
 # --- Resources ---------------------------------------------------------
 PLANKS_PER_LOG = 4   # one collected log yields this many usable planks
 
+# --- Dreamer curriculum -------------------------------------------------
+# These counts are per environment, not global. r2dreamer trains 16 games in
+# parallel, so 4,700 and 9,400 environment steps land near global steps
+# 75k and 150k. A phase only changes when that particular game resets.
+# Human play stays on the full game; see SurvivalGame(curriculum=False).
+CURRICULUM_STAGES = (
+    {"after_env_steps": 0, "starting_planks": 4, "nearby_tree": False, "zombies": False},
+    {"after_env_steps": 4_700, "starting_planks": 0, "nearby_tree": True, "zombies": False},
+    {"after_env_steps": 9_400, "starting_planks": 0, "nearby_tree": True, "zombies": True},
+)
+
 # --- Episode length ----------------------------------------------------
 # Not enforced here, the training harness's TimeLimit wrapper owns it
 # (time_limit: 8000); we only ever report a real death via discount=0.

@@ -27,8 +27,12 @@ class SurvivalEnv(gym.Env):
     metadata = {}
 
     def __init__(self, task="v0", seed=0):
-        assert task == "v0", f"only the v0 task exists so far, got {task!r}"
-        self._game = SurvivalGame(seed=seed)
+        # `train` is the one curriculum-enabled task used by r2dreamer.
+        # `v0`/`full` always start the real game, which keeps evaluation and
+        # recorded videos honest instead of putting a trained policy back in
+        # the introductory no-zombie lesson.
+        assert task in ("v0", "train", "full"), f"unknown task {task!r}"
+        self._game = SurvivalGame(seed=seed, curriculum=(task == "train"))
         self.reward_range = [-np.inf, np.inf]
 
     @property
