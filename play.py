@@ -81,13 +81,13 @@ def main():
 
         over = g.dead or g.won
         if not over:
-            # A no-op action (out of range) when nothing's pressed, not
-            # skipping step() entirely, the game clock (and DAY_LENGTH/
+            # A real no-op action when nothing's pressed, not skipping
+            # step() entirely: the game clock (and DAY_LENGTH/
             # NIGHT_LENGTH, calibrated to steps/sec) has to keep advancing
             # at a steady rate tied to real elapsed frames, or standing
             # idle would silently pause day/night instead of just pausing
             # the player.
-            action = G.NUM_ACTIONS
+            action = G.ACTION_NOOP
             if args.mode == "human":
                 if place_pressed:
                     action = G.ACTION_PLACE

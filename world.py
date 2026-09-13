@@ -8,22 +8,21 @@ CENTER = GRID // 2  # player spawn cell (both axes)
 
 # --- Tile IDs -----------------------------------------------------------
 # A tree isn't one tile, it's several cells built by game.py's _tree_cells.
-# Walking onto the trunk collects a log and clears the whole tree (see
-# game._apply_cell_effects); only a tree's base log is solid (see
+# Walking onto an upper trunk segment collects a log and removes that
+# segment (see game._apply_cell_effects); only a tree's base log is solid (see
 # game._tree_bases), everything else is walk-through and depth-sorted at
 # render time. ZOMBIE/OOB are observation-only stamps, never written to
 # the map.
 GRASS = 0
-LOG = 1        # a pickup lying on the ground; walk over it for +1 inventory
-BLOCK = 2      # placed wall
-LAVA = 3
-TREE_LOG = 4   # one segment of a tree's trunk; walk over it for +1 log
-LEAVES = 5     # tree canopy
-SKY = 6        # top border strip; solid, just a backdrop
-ZOMBIE = 7
-OOB = 8
+BLOCK = 1      # placed wall
+LAVA = 2
+TREE_LOG = 3   # walking onto an upper trunk segment collects that segment
+LEAVES = 4     # tree canopy
+SKY = 5        # top border strip; solid, just a backdrop
+ZOMBIE = 6
+OOB = 7
 
-NUM_TILE_IDS = 9  # for observation normalization
+NUM_TILE_IDS = 8  # for observation normalization
 
 SKY_ROWS = 3  # top rows reserved as an impassable "horizon" strip
 

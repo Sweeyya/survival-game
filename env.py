@@ -5,10 +5,10 @@ this repo's own pig-runner/env.py: subclasses gym.Env and uses gym.spaces,
 but with old-gym call signatures -- reset() returns the obs dict alone,
 step() returns a 4-tuple, and the obs dict carries is_first/is_last/is_terminal.
 
-The 2000-step episode cap is NOT implemented here: r2dreamer's
-wrappers.TimeLimit owns it (configure time_limit: 2000). We only report
-true death, via info["discount"]=0, so hitting the cap stays a truncation
-and death stays a termination.
+The 1000-step episode cap is NOT implemented here: r2dreamer's
+wrappers.TimeLimit owns it (configure time_limit: 1000). We only report
+real terminal outcomes (death or surviving the night), via
+info["discount"]=0, so hitting the cap stays a truncation.
 
 Deliberately never imports pygame -- ParallelEnv constructs this in
 subprocesses.

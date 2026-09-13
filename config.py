@@ -1,8 +1,7 @@
 """Tune difficulty/content here. No code changes needed elsewhere."""
 
 # --- Map generation (fixed at reset, not regenerated mid-episode) ---------
-NUM_TREES = 5           # trees can overlap now (only the base cell blocks),
-                        # kept low so that stays a minor, occasional thing
+NUM_TREES = 5           # whole tree shapes never overlap or cover lava
 NUM_LAVA_POOLS = 2      # a few contiguous blobs, not scattered single tiles
 LAVA_POOL_SIZE = 6
 
@@ -17,7 +16,7 @@ DAY_LENGTH = 360
 NIGHT_LENGTH = 360
 
 # --- Zombies ---------------------------------------------------------------
-ZOMBIE_SPAWN_INTERVAL = 160   # steps between spawns, once it's night
+ZOMBIE_SPAWN_INTERVAL = 60    # six arrivals over one 360-step night
 MAX_ZOMBIES = 6
 
 # --- Resources ---------------------------------------------------------
@@ -37,6 +36,7 @@ REWARD_THREE_ADJACENT = 3.0
 REWARD_FOUR_ADJACENT = 5.0
 REWARD_ENCLOSED_TICK = 1.0
 ENCLOSED_INTERVAL_STEPS = 10   # while all 4 sides solid, +1 every N steps
+REWARD_SURVIVE_NIGHT = 5.0     # one-time reward at dawn, if still alive
 
 # --- Observation -----------------------------------------------------------
 WINDOW_RADIUS = 3      # 7x7 window

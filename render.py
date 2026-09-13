@@ -21,8 +21,6 @@ except ImportError:
 ASSET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
 
 GRASS_COL = (106, 170, 75)
-LOG_COL = (139, 94, 52)
-LOG_RING = (94, 62, 33)
 BLOCK_COL = (120, 120, 128)
 BLOCK_EDGE = (80, 80, 88)
 LAVA_COL = (214, 69, 33)
@@ -59,7 +57,7 @@ LEAF_ALPHA = 215  # a little see-through, per Minecraft's own leaves
 # all: they're drawn in the flat base layer before this sort ever runs, so
 # they're always behind every depth-sorted thing unconditionally.
 #
-# Giving LOG or LEAVES a nonzero depth here was tried (DEPTH_LOG=-1,
+# Giving TREE_LOG or LEAVES a nonzero depth here was tried (DEPTH_LOG=-1,
 # DEPTH_LEAVES=-2, to make a canopy sit in front of the trunk it caps) and
 # reverted: any such shift isn't scoped to that one relationship, it
 # applies to EVERY comparison that type takes part in. DEPTH_LOG=-1 meant
@@ -88,7 +86,6 @@ _FACING_SPRITE = {
 }
 _TILE_SPRITE = {
     W.GRASS: "grass",
-    W.LOG: "log",
     W.BLOCK: "placed_block",
     W.LAVA: "lava",
     # TREE_LOG/LEAVES aren't here: they draw taller than one cell (see
@@ -176,10 +173,6 @@ def _draw_tile_fallback(surf, tile, x, y):
     rect = (x, y, W.TILE, W.TILE)
     if tile == W.GRASS:
         pygame.draw.rect(surf, GRASS_COL, rect)
-    elif tile == W.LOG:
-        pygame.draw.rect(surf, GRASS_COL, rect)
-        pygame.draw.circle(surf, LOG_COL, (x + W.TILE // 2, y + W.TILE // 2), W.TILE // 3)
-        pygame.draw.circle(surf, LOG_RING, (x + W.TILE // 2, y + W.TILE // 2), W.TILE // 3, 2)
     elif tile == W.BLOCK:
         pygame.draw.rect(surf, BLOCK_COL, rect)
         pygame.draw.rect(surf, BLOCK_EDGE, rect, 3)
@@ -492,13 +485,32 @@ def draw_hud(surf, g):
     phase = "night, zombies spawning" if g.is_night else "day"
     lines = [
         f"step {g.steps}  score {g.score}  [{phase}]",
-        f"planks {g.inventory}  zombies {len(g.zombies)}",
+        f"zombies {len(g.zombies)}",
     ]
     y = 6
     for line in lines:
         img = _pixel_text(line, TEXT, scale=2, bg=TEXT_BG)
         surf.blit(img, (6, y))
         y += img.get_height() + 2
+    _draw_inventory_slot(surf, g.inventory)
+
+
+def _draw_inventory_slot(surf, planks):
+    """One deliberately simple inventory slot: a blocky framed square, the
+    plank texture used for placing, and its stack count. It communicates the
+    only resource the game has without presenting a whole unused inventory."""
+    size, margin = 42, 6
+    x, y = surf.get_width() - size - margin, margin
+    pygame.draw.rect(surf, (38, 38, 38), (x, y, size, size))
+    pygame.draw.rect(surf, (120, 120, 120), (x + 2, y + 2, size - 4, size - 4), 2)
+    pygame.draw.rect(surf, (18, 18, 18), (x + 5, y + 5, size - 10, size - 10))
+    plank = _scaled("placed_block", (24, 24))
+    if plank is not None:
+        surf.blit(plank, (x + 9, y + 8))
+    else:
+        pygame.draw.rect(surf, BLOCK_COL, (x + 10, y + 9, 22, 22))
+    count = _pixel_text(str(planks), TEXT, scale=2, bg=TEXT_BG)
+    surf.blit(count, (x + size - count.get_width() - 4, y + size - count.get_height() - 3))
 
 
 def draw_death_screen(surf, g, dead_frames=0):

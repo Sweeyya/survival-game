@@ -28,8 +28,8 @@ except ImportError:
     import config as C
     import world as W
 
-ACTION_UP, ACTION_DOWN, ACTION_LEFT, ACTION_RIGHT, ACTION_PLACE = 0, 1, 2, 3, 4
-NUM_ACTIONS = 5
+ACTION_UP, ACTION_DOWN, ACTION_LEFT, ACTION_RIGHT, ACTION_PLACE, ACTION_NOOP = 0, 1, 2, 3, 4, 5
+NUM_ACTIONS = 6
 _MOVE_ACTION_TO_DIR = {
     ACTION_UP: W.UP,
     ACTION_DOWN: W.DOWN,
@@ -43,8 +43,8 @@ _MOVE_ACTION_TO_DIR = {
 _SOLID_TILES = (W.BLOCK, W.SKY)
 
 # A tree = a stack of TREE_LOGS_TALL log cells (the trunk, growing north/up
-# from a base cell) capped with a leaf canopy, each log is a real,
-# separate, breakable square, not one decorative sprite for the whole tree.
+# from a base cell) capped with a leaf canopy. Walking onto an upper trunk
+# segment collects four planks and removes that one segment.
 TREE_LOGS_TALL = 2
 # A 3-3-1 pyramid sitting directly on the top log: two full 3-wide rows,
 # tapering to a single leaf at the apex.
@@ -70,8 +70,8 @@ def _tree_cells(x, y):
     return cells
 
 # window(49) + inventory(1) + zombie dx/dy/count(3) + facing one-hot(4)
-# + steps(1) + adjacent-solid count(1)
-OBS_DIM = (2 * C.WINDOW_RADIUS + 1) ** 2 + 1 + 3 + 4 + 1 + 1
+# + cycle phase/night flag(2) + adjacent-solid count(1)
+OBS_DIM = (2 * C.WINDOW_RADIUS + 1) ** 2 + 1 + 3 + 4 + 2 + 1
 NO_ZOMBIE_SENTINEL = 1.5  # matches pig-runner's DIST_CLIP_HI "nothing there" idiom
 
 
@@ -116,7 +116,7 @@ class SurvivalGame:
         self.won = False  # set once a full night is survived; see step()
         self.score = 0  # logs collected + blocks placed, a simple HUD number
         self._placed_first_block = False
-        self._prev_adjacent = self._adjacent_solid_count()
+        self._rewarded_adjacent = set()
         self._enclosed_streak = 0
         self._next_zombie_spawn = C.ZOMBIE_SPAWN_INTERVAL
         return self.observation()
@@ -203,7 +203,8 @@ class SurvivalGame:
             reward += self._try_place()
         elif action in _MOVE_ACTION_TO_DIR:
             self._move(_MOVE_ACTION_TO_DIR[action])
-        # any other value is a no-op, same as pig-runner treats out-of-range actions
+        # ACTION_NOOP, and any defensive out-of-range value, leave the world
+        # alone while its clock and zombies continue advancing.
 
         self._apply_cell_effects()
         if self._touching_zombie():
@@ -222,6 +223,7 @@ class SurvivalGame:
         # new cycle) and the player's still alive to see it: that's a win.
         if was_night and not self.is_night and not self.dead:
             self.won = True
+            reward += C.REWARD_SURVIVE_NIGHT
         return reward
 
     def _move(self, direction):
@@ -267,23 +269,10 @@ class SurvivalGame:
                     return True
         return False
 
-    def _tree_base_for(self, x, y):
-        """Which tree's base a (x, y) TREE_LOG cell belongs to, checking
-        every possible trunk offset (the base itself, or however many
-        rows above it TREE_LOGS_TALL allows) rather than assuming a fixed
-        height. None if it isn't part of any tree (shouldn't happen for a
-        real TREE_LOG cell, but keeps _apply_cell_effects safe either way)."""
-        for i in range(TREE_LOGS_TALL):
-            base = (x, y + i)
-            if base in self._tree_bases:
-                return base
-        return None
-
     def _apply_cell_effects(self):
-        """Whatever cell the player is currently standing in: LAVA kills, a
-        stray LOG tile (dormant: trees are the only log source now) is
-        picked up, and walking onto a tree's trunk collects a log and
-        clears the whole tree (see _tree_base_for), no mining, matching
+        """Whatever cell the player is currently standing in: LAVA kills;
+        walking onto an upper tree-trunk tile collects one log and removes
+        that segment, no mining, matching
         pig-runner's walk-over collectibles. One log yields
         C.PLANKS_PER_LOG usable planks (placing still only costs 1, see
         _try_place). Checked every step, not just after a move, since with
@@ -293,19 +282,8 @@ class SurvivalGame:
         if not W.in_bounds(x, y):
             return
         tile = self.grid[y][x]
-        if tile == W.LOG:
+        if tile == W.TREE_LOG:
             self.grid[y][x] = W.GRASS
-            self.inventory += C.PLANKS_PER_LOG
-            self.score += 1
-        elif tile == W.TREE_LOG:
-            base = self._tree_base_for(x, y)
-            if base is not None:
-                for cx, cy in _tree_cells(*base):
-                    if W.in_bounds(cx, cy):
-                        self.grid[cy][cx] = W.GRASS
-                self._tree_bases.discard(base)
-            else:
-                self.grid[y][x] = W.GRASS
             self.inventory += C.PLANKS_PER_LOG
             self.score += 1
         elif tile == W.LAVA:
@@ -342,20 +320,21 @@ class SurvivalGame:
         return count
 
     def _adjacency_reward(self):
-        """Fires the one-time +2/+3/+5 transition rewards (staircase:
+        """Fires the one-time +2/+3/+5 threshold rewards (staircase:
         1 for the first block ever placed, see _try_place, then 2, 3, 5 as
         adjacent solid sides reach 2, 3, 4) and the recurring enclosed-tick
         reward. Adjacency only ever changes by +-1 per step (one placement
         at a time), so 0->1->2->3->4 transitions are never skipped."""
         count = self._adjacent_solid_count()
         reward = 0.0
-        if count >= 2 and self._prev_adjacent < 2:
-            reward += C.REWARD_TWO_ADJACENT
-        if count >= 3 and self._prev_adjacent < 3:
-            reward += C.REWARD_THREE_ADJACENT
-        if count >= 4 and self._prev_adjacent < 4:
-            reward += C.REWARD_FOUR_ADJACENT
-        self._prev_adjacent = count
+        for threshold, bonus in (
+            (2, C.REWARD_TWO_ADJACENT),
+            (3, C.REWARD_THREE_ADJACENT),
+            (4, C.REWARD_FOUR_ADJACENT),
+        ):
+            if count >= threshold and threshold not in self._rewarded_adjacent:
+                self._rewarded_adjacent.add(threshold)
+                reward += bonus
 
         if count >= 4:
             self._enclosed_streak += 1
@@ -464,12 +443,14 @@ class SurvivalGame:
         zdx, zdy = self._nearest_zombie_offset()
         zombie_count_norm = min(1.0, len(self.zombies) / C.MAX_ZOMBIES)
         facing_onehot = [1.0 if self.facing == d else 0.0 for d in (W.UP, W.DOWN, W.LEFT, W.RIGHT)]
-        steps_norm = min(1.0, self.steps / C.MAX_STEPS)
+        cycle = C.DAY_LENGTH + C.NIGHT_LENGTH
+        cycle_phase = (self.steps % cycle) / cycle
+        night = 1.0 if self.is_night else 0.0
         adjacent_norm = self._adjacent_solid_count() / 4.0
 
         return (
             window_norm
             + [float(inventory_norm), float(zdx), float(zdy), float(zombie_count_norm)]
             + facing_onehot
-            + [float(steps_norm), float(adjacent_norm)]
+            + [float(cycle_phase), night, float(adjacent_norm)]
         )
