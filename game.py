@@ -91,7 +91,10 @@ class SurvivalGame:
         thresholds in config correspond roughly to 75k and 150k global
         training steps."""
         if not self._curriculum:
-            return {"starting_planks": 0, "nearby_tree": False, "zombies": True}
+            return {
+                "starting_planks": 0, "nearby_tree": False, "zombies": True,
+                "lava_pools": C.NUM_LAVA_POOLS, "require_enclosure": False,
+            }
         settings = C.CURRICULUM_STAGES[0]
         for candidate in C.CURRICULUM_STAGES:
             if self._lifetime_steps >= candidate["after_env_steps"]:
@@ -128,7 +131,7 @@ class SurvivalGame:
         if self._episode_settings["nearby_tree"]:
             self._place_nearby_tree(occupied)
         self._scatter_trees(C.NUM_TREES, occupied)
-        self._scatter_lava_pools(C.NUM_LAVA_POOLS, C.LAVA_POOL_SIZE, occupied)
+        self._scatter_lava_pools(self._episode_settings["lava_pools"], C.LAVA_POOL_SIZE, occupied)
 
         self.steps = 0
         self.dead = False
@@ -238,7 +241,7 @@ class SurvivalGame:
         # ACTION_NOOP, and any defensive out-of-range value, leave the world
         # alone while its clock and zombies continue advancing.
 
-        self._apply_cell_effects()
+        reward += self._apply_cell_effects()
         if self._touching_zombie():
             self.dead = True
 
@@ -256,7 +259,11 @@ class SurvivalGame:
         # new cycle) and the player's still alive to see it: that's a win.
         if was_night and not self.is_night and not self.dead:
             self.won = True
-            reward += C.REWARD_SURVIVE_NIGHT
+            if (
+                not self._episode_settings["require_enclosure"]
+                or self._adjacent_solid_count() >= 4
+            ):
+                reward += C.REWARD_SURVIVE_NIGHT
         return reward
 
     def _move(self, direction):
@@ -307,20 +314,23 @@ class SurvivalGame:
         walking onto an upper tree-trunk tile collects one log and removes
         that segment, no mining, matching
         pig-runner's walk-over collectibles. One log yields
-        C.PLANKS_PER_LOG usable planks (placing still only costs 1, see
-        _try_place). Checked every step, not just after a move, since with
-        continuous position "did you move to a new cell" isn't the only
-        way to still be standing in one."""
+            C.PLANKS_PER_LOG usable planks and a small collection reward
+            (placing still only costs 1, see
+            _try_place). Checked every step, not just after a move, since with
+            continuous position "did you move to a new cell" isn't the only
+            way to still be standing in one."""
         x, y = int(self.px), int(self.py)
         if not W.in_bounds(x, y):
-            return
+            return 0.0
         tile = self.grid[y][x]
         if tile == W.TREE_LOG:
             self.grid[y][x] = W.GRASS
             self.inventory += C.PLANKS_PER_LOG
             self.score += 1
+            return C.REWARD_COLLECT_LOG
         elif tile == W.LAVA:
             self.dead = True
+        return 0.0
 
     def _try_place(self):
         px, py = int(self.px), int(self.py)

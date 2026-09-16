@@ -28,9 +28,9 @@ PLANKS_PER_LOG = 4   # one collected log yields this many usable planks
 # 75k and 150k. A phase only changes when that particular game resets.
 # Human play stays on the full game; see SurvivalGame(curriculum=False).
 CURRICULUM_STAGES = (
-    {"after_env_steps": 0, "starting_planks": 4, "nearby_tree": False, "zombies": False},
-    {"after_env_steps": 4_700, "starting_planks": 0, "nearby_tree": True, "zombies": False},
-    {"after_env_steps": 9_400, "starting_planks": 0, "nearby_tree": True, "zombies": True},
+    {"after_env_steps": 0, "starting_planks": 4, "nearby_tree": False, "zombies": False, "lava_pools": 0, "require_enclosure": True},
+    {"after_env_steps": 4_700, "starting_planks": 0, "nearby_tree": True, "zombies": False, "lava_pools": 0, "require_enclosure": True},
+    {"after_env_steps": 9_400, "starting_planks": 0, "nearby_tree": True, "zombies": True, "lava_pools": NUM_LAVA_POOLS, "require_enclosure": False},
 )
 
 # --- Episode length ----------------------------------------------------
@@ -42,6 +42,7 @@ MAX_STEPS = 8000
 # Staircase as adjacent solid sides go 0 -> 4: 1 (first block ever placed,
 # see _try_place), 2, 3, 5.
 REWARD_FIRST_BLOCK = 1.0
+REWARD_COLLECT_LOG = 1.0
 REWARD_TWO_ADJACENT = 2.0
 REWARD_THREE_ADJACENT = 3.0
 REWARD_FOUR_ADJACENT = 5.0
