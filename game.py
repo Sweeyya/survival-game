@@ -78,10 +78,10 @@ NO_ZOMBIE_SENTINEL = 1.5  # matches pig-runner's DIST_CLIP_HI "nothing there" id
 class SurvivalGame:
     """The game itself. Advance it with step(action); read state off the attrs."""
 
-    def __init__(self, seed=0, curriculum=False):
+    def __init__(self, seed=0, curriculum=False, curriculum_step_offset=0):
         self._rng = random.Random(seed)
         self._curriculum = curriculum
-        self._lifetime_steps = 0
+        self._lifetime_steps = curriculum_step_offset
         self.reset()
 
     def _settings_for_episode(self):
