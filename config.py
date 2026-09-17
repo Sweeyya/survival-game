@@ -30,7 +30,10 @@ PLANKS_PER_LOG = 4   # one collected log yields this many usable planks
 CURRICULUM_STAGES = (
     {"after_env_steps": 0, "starting_planks": 4, "nearby_tree": False, "zombies": False, "lava_pools": 0, "require_enclosure": True},
     {"after_env_steps": 4_700, "starting_planks": 0, "nearby_tree": True, "zombies": False, "lava_pools": 0, "require_enclosure": True},
-    {"after_env_steps": 9_400, "starting_planks": 0, "nearby_tree": True, "zombies": True, "lava_pools": NUM_LAVA_POOLS, "require_enclosure": False},
+    # Learn the lava map before adding a moving threat. With 16 parallel
+    # games, these start near global steps 125k and 175k respectively.
+    {"after_env_steps": 7_800, "starting_planks": 0, "nearby_tree": True, "zombies": False, "lava_pools": NUM_LAVA_POOLS, "require_enclosure": True},
+    {"after_env_steps": 11_000, "starting_planks": 0, "nearby_tree": True, "zombies": True, "lava_pools": NUM_LAVA_POOLS, "require_enclosure": False},
 )
 
 # --- Episode length ----------------------------------------------------
